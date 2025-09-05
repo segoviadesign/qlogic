@@ -4,3 +4,6 @@ requests==2.32.3
 pandas==2.2.2
 openpyxl==3.1.5         # para Excel
 WeasyPrint==62.3        # para PDF (requiere deps del SO: libpango, libffi, etc.)
+gunicorn
+xhtml2pdf
+

@@ -1,6 +1,4 @@
-# wsgi.py
-import os
-from app import app as application  # 'application' es el nombre WSGI estándar
+from app import app
 
-# Opcional: variables de entorno para producción
-os.environ.setdefault("FLASK_ENV", "production")
+if __name__ == "__main__":
+    app.run()
