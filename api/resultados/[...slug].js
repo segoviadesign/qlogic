@@ -1,26 +1,37 @@
-export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).send("Method Not Allowed");
+// Ejecuta en Edge (rápido y sin cold starts)
+export const config = { runtime: "edge" };
 
-  // slug será ["getResultados"] si llamás a /api/resultados/getResultados
-  const { slug = [] } = req.query;
-  const path = "/" + slug.join("/");           // "/getResultados" o ""
+const UPSTREAM = "https://resultados.mininterior.gob.ar/api";
 
-  if (path !== "/getResultados") return res.status(403).send("Not allowed");
+export default async function handler(req) {
+  const url = new URL(req.url);
 
-  const query = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-  const upstream = "https://resultados.mininterior.gob.ar/api/resultados/getResultados" + query;
+  // Viene como /api/resultados/...
+  const path = url.pathname; // ej: /api/resultados/getResultados
 
-  try {
-    const r = await fetch(upstream, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; qlogic-proxy/1.0)",
-        "Accept": "application/json"
-      }
-    });
-    res.status(r.status);
-    const body = await r.text();
-    res.send(body);
-  } catch (e) {
-    res.status(502).send("Upstream error: " + (e?.message ?? e));
+  // Aceptamos SÓLO /api/resultados/*
+  if (!path.startsWith("/api/resultados/")) {
+    return new Response("Not allowed", { status: 403 });
   }
+
+  // Construimos la URL real al upstream: /resultados/*
+  const upstream = new URL(UPSTREAM);
+  upstream.pathname = path.replace(/^\/api/, ""); // -> /resultados/...
+  upstream.search = url.search;
+
+  const headers = new Headers(req.headers);
+  headers.set("User-Agent", "Mozilla/5.0 (compatible; qlogic-proxy/1.0)");
+  headers.set("Accept", "application/json");
+
+  // Si alguna vez te dan token oficial, descomentá:
+  // const token = process.env.BEARER_TOKEN;
+  // if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  const resp = await fetch(upstream.toString(), { method: "GET", headers });
+
+  const out = new Headers(resp.headers);
+  // Cache opcional:
+  // out.set("Cache-Control", "public, max-age=60");
+
+  return new Response(resp.body, { status: resp.status, headers: out });
 }
